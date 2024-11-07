@@ -1,0 +1,29 @@
+{
+    "bot_token": "YOUR_BOT_TOKEN",
+    "admin_users": [
+        123456789  // Admin user IDs
+    ],
+    "regions": {
+        "us": {
+            "cookies_file": "config/cookies_us.txt",
+            "language": "en-US",
+            "storefront": "143441"
+        },
+        "jp": {
+            "cookies_file": "config/cookies_jp.txt",
+            "language": "ja-JP",
+            "storefront": "143462"
+        },
+        "uk": {
+            "cookies_file": "config/cookies_uk.txt",
+            "language": "en-GB",
+            "storefront": "143444"
+        }
+    },
+    "download_settings": {
+        "output_path": "./downloads",
+        "temp_path": "./temp",
+        "max_concurrent_downloads": 2,
+        "download_timeout": 3600
+    }
+}
