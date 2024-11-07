@@ -17,3 +17,11 @@ class AuthorizationError(BotException):
 class RegionError(BotException):
     """Region related errors"""
     pass
+
+class AppleMusicAPIError(BotException):
+    """Apple Music API related errors"""
+    pass
+
+class RateLimitError(BotException):
+    """Rate limit related errors"""
+    pass
