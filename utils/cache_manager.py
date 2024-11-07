@@ -1,7 +1,7 @@
 import json
 import time
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Any, Optional
 
 class CacheManager:
     def __init__(self, cache_dir: Path, max_age: int = 3600):
@@ -10,11 +10,9 @@ class CacheManager:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         
     def _get_cache_path(self, key: str) -> Path:
-        """Get cache file path for key"""
         return self.cache_dir / f"{key}.json"
         
-    def get(self, key: str) -> Optional[Dict]:
-        """Get cached data if not expired"""
+    def get(self, key: str) -> Optional[Any]:
         cache_path = self._get_cache_path(key)
         if not cache_path.exists():
             return None
@@ -30,7 +28,6 @@ class CacheManager:
             return None
             
     def set(self, key: str, value: Any):
-        """Cache data with timestamp"""
         cache_path = self._get_cache_path(key)
         data = {
             "timestamp": time.time(),
@@ -39,6 +36,5 @@ class CacheManager:
         cache_path.write_text(json.dumps(data))
         
     def clear(self):
-        """Clear all cached data"""
         for cache_file in self.cache_dir.glob("*.json"):
             cache_file.unlink()
