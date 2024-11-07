@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  bot:
+    build: .
+    container_name: apple-music-bot
+    restart: unless-stopped
+    volumes:
+      - ./downloads:/app/downloads
+      - ./config:/app/config
+      - ./cache:/app/cache
+    environment:
+      - TZ=UTC
+      - CONFIG_PATH=/app/config/config.json
