@@ -1,185 +1,194 @@
-import logging
 import asyncio
+import json
+import logging
 import os
-from datetime import datetime
 from pathlib import Path
-from typing import Dict, Set
+from typing import Dict, Optional, List
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-    ApplicationBuilder,
-    ContextTypes,
+    Application,
     CommandHandler,
+    ContextTypes,
     MessageHandler,
     CallbackQueryHandler,
     filters,
 )
-from telegram.constants import ParseMode
 
-from gamdl.apple_music_api import AppleMusicApi
-from gamdl.downloader import Downloader
-from gamdl.downloader_song import DownloaderSong
-from gamdl.downloader_music_video import DownloaderMusicVideo
+from gamdl import (
+    AppleMusicApi,
+    Downloader,
+    DownloaderSong,
+    DownloaderMusicVideo,
+    DownloaderPost,
+    ItunesApi,
+)
+from gamdl.enums import (
+    DownloadMode,
+    RemuxMode,
+    SongCodec,
+    MusicVideoCodec,
+    PostQuality,
+    CoverFormat,
+)
 
-# Configuration
-TELEGRAM_BOT_TOKEN = "YOUR_BOT_TOKEN"
-ADMIN_USER_IDS = {123456789}  # Add admin Telegram user IDs here
-DOWNLOAD_PATH = Path("./downloads")
-TEMP_PATH = Path("./temp")
-COOKIES_PATH = Path("./cookies.txt")
-
-# Initialize logging
+# Configure logging
 logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
-# Global state
-active_downloads: Dict[int, Set[str]] = {}  # User ID -> Set of download IDs
-download_history: Dict[int, list] = {}  # User ID -> List of downloads
-
-class GamdlBot:
+class AppleMusicBot:
     def __init__(self):
-        # Initialize APIs and downloaders
-        self.apple_music_api = AppleMusicApi(cookies_path=COOKIES_PATH)
-        self.downloader = Downloader(
-            self.apple_music_api,
-            output_path=DOWNLOAD_PATH,
-            temp_path=TEMP_PATH
-        )
-        self.downloader_song = DownloaderSong(self.downloader)
-        self.downloader_music_video = DownloaderMusicVideo(self.downloader)
+        self.config = self.load_config()
+        self.active_downloads: Dict[int, asyncio.Task] = {}
+        self.download_progress: Dict[int, Dict] = {}
         
-        # Set up download directories
-        DOWNLOAD_PATH.mkdir(parents=True, exist_ok=True)
-        TEMP_PATH.mkdir(parents=True, exist_ok=True)
+    def load_config(self) -> dict:
+        """Load bot configuration"""
+        with open("config/config.json", "r", encoding="utf-8") as f:
+            return json.load(f)
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /start command"""
+        """Handler for /start command"""
         welcome_text = (
-            "👋 *Welcome to Apple Music Downloader Bot!*\n\n"
-            "I can help you download songs and music videos from Apple Music.\n\n"
-            "*Commands:*\n"
-            "/download `<Apple Music URL>` - Download song/video\n"
-            "/history - View your download history\n"
-            "/help - Show this help message\n\n"
-            "*Supported URLs:*\n"
-            "• Song URLs\n"
-            "• Album URLs\n"
-            "• Playlist URLs\n"
-            "• Music Video URLs"
+            "👋 Welcome to Apple Music Downloader Bot!\n\n"
+            "Available commands:\n"
+            "/download <URL> <region> - Download from Apple Music\n"
+            "/regions - Show available regions\n"
+            "/settings - Configure download settings\n"
+            "/status - Check download status\n"
+            "/cancel - Cancel active download\n\n"
+            "Available regions: " + ", ".join(self.config["regions"].keys()).upper()
         )
-        await update.message.reply_text(welcome_text, parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_text(welcome_text)
 
-    async def help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /help command"""
-        await self.start(update, context)
+    async def regions(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Show available regions and their details"""
+        regions_text = "🌎 Available regions:\n\n"
+        for region, config in self.config["regions"].items():
+            regions_text += (
+                f"• {region.upper()}:\n"
+                f"  Language: {config['language']}\n"
+                f"  Storefront: {config['storefront']}\n\n"
+            )
+        await update.message.reply_text(regions_text)
+
+    async def settings(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Show and modify download settings"""
+        keyboard = [
+            [
+                InlineKeyboardButton("Song Codec", callback_data="set_song_codec"),
+                InlineKeyboardButton("Video Codec", callback_data="set_video_codec")
+            ],
+            [
+                InlineKeyboardButton("Download Mode", callback_data="set_download_mode"),
+                InlineKeyboardButton("Remux Mode", callback_data="set_remux_mode")
+            ],
+            [
+                InlineKeyboardButton("Cover Format", callback_data="set_cover_format"),
+                InlineKeyboardButton("Quality", callback_data="set_quality")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text("⚙️ Select setting to modify:", reply_markup=reply_markup)
+
+    async def handle_settings_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle settings callback queries"""
+        query = update.callback_query
+        await query.answer()
+
+        if query.data == "set_song_codec":
+            options = [codec.value for codec in SongCodec]
+        elif query.data == "set_video_codec":
+            options = [codec.value for codec in MusicVideoCodec]
+        elif query.data == "set_download_mode":
+            options = [mode.value for mode in DownloadMode]
+        elif query.data == "set_remux_mode":
+            options = [mode.value for mode in RemuxMode]
+        elif query.data == "set_cover_format":
+            options = [fmt.value for fmt in CoverFormat]
+        elif query.data == "set_quality":
+            options = [quality.value for quality in PostQuality]
+
+        keyboard = [
+            [InlineKeyboardButton(opt, callback_data=f"option_{opt}")]
+            for opt in options
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(
+            f"Select {query.data.replace('set_', '').replace('_', ' ')}:",
+            reply_markup=reply_markup
+        )
 
     async def download(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /download command"""
+        """Handle download command"""
         user_id = update.effective_user.id
         
-        # Check if user has active downloads
-        if user_id in active_downloads and len(active_downloads[user_id]) >= 3:
-            await update.message.reply_text(
-                "❌ You have too many active downloads. Please wait for them to complete."
-            )
+        # Check authorization
+        if not self.is_authorized(user_id):
+            await update.message.reply_text("⛔️ You are not authorized to use this bot.")
             return
 
-        # Get URL from command
-        if not context.args:
+        # Validate command format
+        if not context.args or len(context.args) < 2:
             await update.message.reply_text(
-                "❌ Please provide an Apple Music URL.\n"
-                "Example: `/download https://music.apple.com/...`",
-                parse_mode=ParseMode.MARKDOWN
+                "❌ Invalid format. Use: /download <URL> <region>\n"
+                "Example: /download https://music.apple.com/... us"
             )
             return
 
         url = context.args[0]
-        
+        region = context.args[1].lower()
+
+        # Validate region
+        if not self.is_valid_region(region):
+            await update.message.reply_text(
+                f"❌ Invalid region: {region}\n"
+                f"Available regions: {', '.join(self.config['regions'].keys()).upper()}"
+            )
+            return
+
+        # Check active downloads
+        if user_id in self.active_downloads:
+            await update.message.reply_text(
+                "⚠️ You already have an active download. "
+                "Use /cancel to cancel it first."
+            )
+            return
+
+        # Initialize download
+        status_message = await update.message.reply_text("🔄 Initializing download...")
+        download_task = asyncio.create_task(
+            self._process_download(update, context, url, region, status_message)
+        )
+        self.active_downloads[user_id] = download_task
+
+    async def _process_download(self, update: Update, context: ContextTypes.DEFAULT_TYPE, 
+                              url: str, region: str, status_message):
+        """Process the download"""
+        user_id = update.effective_user.id
         try:
-            # Send processing message
-            status_message = await update.message.reply_text(
-                "🔄 Processing your request..."
+            # Initialize APIs
+            region_config = self.config["regions"][region]
+            apple_music_api = AppleMusicApi(
+                cookies_path=Path(region_config["cookies_file"]),
+                language=region_config["language"],
+                storefront=region_config["storefront"]
+            )
+            
+            itunes_api = ItunesApi(
+                storefront=region_config["storefront"],
+                language=region_config["language"]
             )
 
-            # Get download information
-            url_info = self.downloader.get_url_info(url)
-            download_queue = self.downloader.get_download_queue(url_info)
-
-            # Initialize user's active downloads if needed
-            if user_id not in active_downloads:
-                active_downloads[user_id] = set()
-
-            # Process each track
-            for track in download_queue.tracks_metadata:
-                try:
-                    # Update status message
-                    await status_message.edit_text(
-                        f"⏳ Downloading: {track['attributes']['name']}"
-                    )
-
-                    if track["type"] == "songs":
-                        await self.process_song(track, user_id, status_message)
-                    elif track["type"] == "music-videos":
-                        await self.process_music_video(track, user_id, status_message)
-
-                    # Add to history
-                    if user_id not in download_history:
-                        download_history[user_id] = []
-                    download_history[user_id].append({
-                        'title': track['attributes']['name'],
-                        'type': track['type'],
-                        'date': datetime.now().isoformat()
-                    })
-
-                except Exception as e:
-                    logger.error(f"Error processing track: {str(e)}", exc_info=True)
-                    await status_message.edit_text(
-                        f"❌ Error downloading {track['attributes']['name']}: {str(e)}"
-                    )
-
-            await status_message.edit_text("✅ Download complete!")
-
-        except Exception as e:
-            logger.error(f"Error processing URL: {str(e)}", exc_info=True)
-            await status_message.edit_text(f"❌ Error: {str(e)}")
-
-    async def process_song(self, track, user_id, status_message):
-        """Process and download a song"""
-        # Get song information
-        webplayback = self.apple_music_api.get_webplayback(track["id"])
-        tags = self.downloader_song.get_tags(webplayback, None)
-        
-        # Get stream info and download
-        stream_info = self.downloader_song.get_stream_info(track)
-        
-        if not stream_info.stream_url:
-            raise Exception("Song not available for download")
-
-        # Get decryption key
-        decryption_key = self.downloader.get_decryption_key(
-            stream_info.pssh, 
-            track["id"]
-        )
-
-        # Download and process
-        encrypted_path = self.downloader_song.get_encrypted_path(track["id"])
-        decrypted_path = self.downloader_song.get_decrypted_path(track["id"])
-        remuxed_path = self.downloader_song.get_remuxed_path(track["id"])
-
-        # Download
-        await status_message.edit_text(f"⏳ Downloading: {tags['title']}")
-        self.downloader.download(encrypted_path, stream_info.stream_url)
-
-        # Decrypt
-        await status_message.edit_text(f"🔄 Processing: {tags['title']}")
-        self.downloader_song.decrypt(encrypted_path, decrypted_path, decryption_key)
-
-        # Remux
-        self.downloader_song.remux(decrypted_path, remuxed_path, stream_info.codec)
-
-        # Move to final location
-        final_path = self.downloader.get_final_path(tags, ".m4a")
-        self.downloader.move_to_output_path(rem
+            # Initialize downloaders
+            downloader = Downloader(
+                apple_music_api=apple_music_api,
+                itunes_api=itunes_api,
+                output_path=Path(self.config["download_settings"]["output_path"]),
+                temp_path=Path(self.config["download_settings"]["temp_path"]),
+                download_mode=DownloadMode(self.config["download_settings"]["download_mode"]),
+                remux_mode=RemuxMode(self.config["download_settings"]["remux_mode"]),
+                cover_
