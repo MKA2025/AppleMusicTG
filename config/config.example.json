@@ -1,8 +1,9 @@
 {
     "bot_token": "YOUR_BOT_TOKEN",
-    "admin_users": [
-        123456789
-    ],
+    "admin_users": [123456789],
+    "log_channel_id": -100123456789,
+    "auth_channel_id": -100987654321,
+    "auth_channel_link": "https://t.me/yourchannel",
     "regions": {
         "us": {
             "cookies_file": "config/cookies_us.txt",
@@ -18,20 +19,15 @@
         "download_mode": "ytdlp",
         "remux_mode": "ffmpeg",
         "cover_format": "jpg",
-        "song_codec": "aac-legacy",
-        "video_codec": "h264",
-        "post_quality": "best",
-        "cover_size": 1200,
-        "save_cover": false,
-        "save_lyrics": true
+        "cover_size": 1200
     },
-    "templates": {
-        "folder_album": "{album_artist}/{album}",
-        "folder_compilation": "Compilations/{album}",
-        "file_single_disc": "{track:02d} {title}",
-        "file_multi_disc": "{disc}-{track:02d} {title}",
-        "folder_no_album": "{artist}/Unknown Album",
-        "file_no_album": "{title}",
-        "file_playlist": "Playlists/{playlist_title}"
+    "log_settings": {
+        "log_downloads": true,
+        "log_errors": true,
+        "log_user_joins": true,
+        "notification_settings": {
+            "admin_notifications": true,
+            "error_notifications": true
+        }
     }
 }
