@@ -19,7 +19,9 @@
         "download_mode": "ytdlp",
         "remux_mode": "ffmpeg",
         "cover_format": "jpg",
-        "cover_size": 1200
+        "cover_size": 1200,
+        "auto_delete": true,
+        "delete_delay": 300
     },
     "log_settings": {
         "log_downloads": true,
