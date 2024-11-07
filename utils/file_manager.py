@@ -1,43 +1,63 @@
+import os
+import asyncio
 import shutil
 from pathlib import Path
+from datetime import datetime
 from typing import Optional
-from PIL import Image
-import os
 
 class FileManager:
-    def __init__(self, base_dir: Path):
-        self.base_dir = base_dir
-        self.base_dir.mkdir(parents=True, exist_ok=True)
+    def __init__(self, config: dict):
+        self.config = config
+        self.output_path = Path(config['download_settings']['output_path'])
+        self.temp_path = Path(config['download_settings']['temp_path'])
+        self.auto_delete = config['download_settings'].get('auto_delete', False)
+        self.delete_delay = config['download_settings'].get('delete_delay', 300)
         
-    def save_artwork(self, artwork_data: bytes, path: Path, size: Optional[int] = None) -> Path:
-        """Save artwork with optional resizing"""
-        path.parent.mkdir(parents=True, exist_ok=True)
-        
-        if size:
-            # Resize image
-            img = Image.open(artwork_data)
-            img.thumbnail((size, size))
-            img.save(path)
-        else:
-            # Save original
-            path.write_bytes(artwork_data)
-            
-        return path
-        
-    def create_m3u_playlist(self, playlist_path: Path, track_paths: list[Path]):
-        """Create M3U playlist file"""
-        playlist_path.parent.mkdir(parents=True, exist_ok=True)
-        with playlist_path.open('w', encoding='utf-8') as f:
-            f.write('#EXTM3U\n')
-            for track_path in track_paths:
-                rel_path = os.path.relpath(track_path, playlist_path.parent)
-                f.write(f'{rel_path}\n')
-                
-    def cleanup_temp_files(self, temp_dir: Path):
-        """Clean up temporary files and directories"""
-        if temp_dir.exists():
-            shutil.rmtree(temp_dir)
-            
+        # Create necessary directories
+        self.output_path.mkdir(parents=True, exist_ok=True)
+        self.temp_path.mkdir(parents=True, exist_ok=True)
+
+    async def schedule_delete(self, file_path: Path):
+        """Schedule file deletion after configured delay"""
+        if self.auto_delete:
+            try:
+                await asyncio.sleep(self.delete_delay)
+                self.delete_file(file_path)
+            except Exception as e:
+                print(f"Error in scheduled deletion of {file_path}: {e}")
+
+    def delete_file(self, file_path: Path):
+        """Delete a single file"""
+        try:
+            if file_path.exists():
+                os.remove(file_path)
+                print(f"Deleted file: {file_path}")
+        except Exception as e:
+            print(f"Error deleting file {file_path}: {e}")
+
+    def cleanup_temp(self):
+        """Clean up temporary directory"""
+        try:
+            if self.temp_path.exists():
+                shutil.rmtree(self.temp_path)
+                self.temp_path.mkdir(exist_ok=True)
+        except Exception as e:
+            print(f"Error cleaning temp directory: {e}")
+
+    def get_file_size(self, file_path: Path) -> int:
+        """Get file size in bytes"""
+        try:
+            return file_path.stat().st_size
+        except Exception:
+            return 0
+
     def get_free_space(self) -> int:
         """Get free space in bytes"""
-        return shutil.disk_usage(self.base_dir).free
+        return shutil.disk_usage(self.output_path).free
+
+    def is_safe_path(self, path: Path) -> bool:
+        """Check if path is safe (within output directory)"""
+        try:
+            return path.resolve().is_relative_to(self.output_path)
+        except Exception:
+            return False
