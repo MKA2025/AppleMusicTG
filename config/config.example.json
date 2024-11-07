@@ -1,0 +1,37 @@
+{
+    "bot_token": "YOUR_BOT_TOKEN",
+    "admin_users": [
+        123456789
+    ],
+    "regions": {
+        "us": {
+            "cookies_file": "config/cookies_us.txt",
+            "language": "en-US",
+            "storefront": "143441"
+        }
+    },
+    "download_settings": {
+        "output_path": "./downloads",
+        "temp_path": "./temp",
+        "max_concurrent_downloads": 2,
+        "download_timeout": 3600,
+        "download_mode": "ytdlp",
+        "remux_mode": "ffmpeg",
+        "cover_format": "jpg",
+        "song_codec": "aac-legacy",
+        "video_codec": "h264",
+        "post_quality": "best",
+        "cover_size": 1200,
+        "save_cover": false,
+        "save_lyrics": true
+    },
+    "templates": {
+        "folder_album": "{album_artist}/{album}",
+        "folder_compilation": "Compilations/{album}",
+        "file_single_disc": "{track:02d} {title}",
+        "file_multi_disc": "{disc}-{track:02d} {title}",
+        "folder_no_album": "{artist}/Unknown Album",
+        "file_no_album": "{title}",
+        "file_playlist": "Playlists/{playlist_title}"
+    }
+}
