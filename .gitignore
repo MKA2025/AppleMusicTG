@@ -1,7 +1,5 @@
-/*
-__pycache__
-!gamdl
-!.gitignore
-!pyproject.toml
-!README.md
-!requirements.txt
+__pycache__/
+*.pyc
+downloads/
+temp/
+cookies.txt
