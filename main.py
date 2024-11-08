@@ -19,12 +19,11 @@ from telegram.ext import (
 from utils.config_manager import ConfigManager
 from utils.logger import TelegramLogger
 from utils.database import DatabaseManager
-from notification_manager import NotificationManager
-from bandwidth_tracker import BandwidthTracker
-from metadata_enhancer import MetadataEnhancer
-from gamdl.cli import main as gamdl_download
+from utils.notification_manager import NotificationManager
+from utils.bandwidth_tracker import BandwidthTracker
+from utils.media_analyzer import MediaAnalyzer
 
-# Import other necessary components
+# Import handlers
 from handlers.user_handler import UserHandler
 from handlers.download_handler import DownloadHandler
 from handlers.admin_handler import AdminHandler
@@ -47,14 +46,13 @@ class MusicDownloadBot:
             logging.critical("No Telegram Bot Token found!")
             sys.exit(1)
 
-        # Initialize managers
+        # Initialize additional managers
         self.notification_manager = NotificationManager(
-            bot=self.application.bot,
             config=self.config_manager.get_all()
         )
         self.bandwidth_tracker = BandwidthTracker()
+        self.media_analyzer = MediaAnalyzer()
         self.telegram_logger = TelegramLogger(
-            bot=self.application.bot, 
             log_channel_id=self.config_manager.get('LOG_CHANNEL_ID')
         )
 
@@ -74,58 +72,135 @@ class MusicDownloadBot:
         try:
             # Initialize Telegram Bot
             self.application = Application.builder().token(self.bot_token).build()
+            
+            # Register handlers
             self._register_handlers()
+            
             logging.info("Bot initialized successfully")
+            
+            # Send startup notification
+            await self._send_startup_notification()
+        
         except Exception as e:
             logging.error(f"Bot initialization failed: {e}")
             await self.telegram_logger.log_error(e)
 
     def _register_handlers(self):
         """Register all bot command and message handlers"""
-        user_handler = UserHandler(self.database_manager, self.notification_manager)
-        download_handler = DownloadHandler(self.database_manager, self.bandwidth_tracker, self.notification_manager)
-        admin_handler = AdminHandler(self.database_manager, self.notification_manager)
+        # Initialize handler classes
+        user_handler = UserHandler(
+            self.database_manager, 
+            self.notification_manager
+        )
+        download_handler = DownloadHandler(
+            self.database_manager, 
+            self.bandwidth_tracker, 
+            self.notification_manager
+        )
+        admin_handler = AdminHandler(
+            self.database_manager, 
+            self.notification_manager
+        )
 
         # Command Handlers
-        self.application.add_handler(CommandHandler('start', user_handler.start_command))
-        self.application.add_handler(CommandHandler('help', user_handler.help_command))
-        self.application.add_handler(CommandHandler('download', download_handler.download_command))
-        
-        # Admin Commands
-        self.application.add_handler(CommandHandler('admin', admin_handler.admin_command))
-        
-        # Message Handlers
-        self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, download_handler.handle_download_url))
+        handlers = [
+            # User Commands
+            CommandHandler('start', user_handler.start_command),
+            CommandHandler('help', user_handler.help_command),
+            CommandHandler('stats', user_handler.get_user_stats),
+            
+            # Download Commands
+            CommandHandler('download', download_handler.download_command),
+            CommandHandler('queue', download_handler.show_download_queue),
+            
+            # Admin Commands
+            CommandHandler('admin', admin_handler.admin_command),
+            CommandHandler('broadcast', admin_handler.broadcast_command),
+            
+            # Message Handlers
+            MessageHandler(
+                filters.TEXT & ~filters.COMMAND, 
+                download_handler.handle_download_url
+            )
+        ]
 
-    async def download_music(self, url: str, user_id: int):
-        """Wrapper for music download functionality"""
+        # Add handlers to application
+        for handler in handlers:
+            self.application.add_handler(handler)
+
+    async def _send_startup_notification(self):
+        """Send startup notification to admin or log channel"""
         try:
-            # Prepare download parameters
-            sys.argv = ['gamdl', url, '--cookies-path', f'cookies/{user_id}_cookies.txt']
-            # Execute download
-            await gamdl_download()
-            # Log successful download
-            await self.telegram_logger.log_download(user_id=user_id, user_name="", track_info={"url": url})
+            admin_chat_id = self.config_manager.get('ADMIN_CHAT_ID')
+            if admin_chat_id:
+                await self.notification_manager.queue_notification(
+                    recipient=admin_chat_id,
+                    message="🤖 Bot Started Successfully!\n"
+                            f"Timestamp: {datetime.now()}"
+                )
         except Exception as e:
-            logging.error(f"Download failed: {e}")
-            await self.telegram_logger.log_error(e)
+            logging.error(f"Startup notification error: {e}")
 
     async def start_background_tasks(self):
-        """Start background tasks"""
-        asyncio.create_task(self.bandwidth_tracker.monitor_bandwidth())
+        """Start background monitoring tasks"""
+        tasks = [
+            # Bandwidth monitoring
+            asyncio.create_task(self.bandwidth_tracker.monitor_bandwidth()),
+            
+            # Notification queue processing
+            asyncio.create_task(
+                self.notification_manager.process_notification_queue()
+            )
+        ]
+        return tasks
 
     async def run(self):
         """Main bot run method"""
-        await self.initialize_bot()
-        await self.start_background_tasks()
-        # Start polling
-        await self.application.run_polling(drop_pending_updates=True)
+        try:
+            # Initialize bot
+            await self.initialize_bot()
+            
+            # Start background tasks
+            background_tasks = await self.start_background_tasks()
+            
+            # Start polling
+            await self.application.run_polling(
+                drop_pending_updates=True,
+                stop_signals=None
+            )
+            
+            # Wait for background tasks
+            await asyncio.gather(*background_tasks)
+        
+        except KeyboardInterrupt:
+            logging.info("Bot stopped by user")
+        except Exception as e:
+            logging.error(f"Unexpected bot run error: {e}")
+            await self.telegram_logger.log_error(e)
+        finally:
+            # Cleanup tasks
+            await self.cleanup()
+
+    async def cleanup(self):
+        """Perform cleanup operations"""
+        try:
+            # Close database connections
+            await self.database_manager.close()
+            
+            # Stop background tasks
+            for task in asyncio.all_tasks():
+                task.cancel()
+            
+            logging.info("Bot cleanup completed")
+        except Exception as e:
+            logging.error(f"Cleanup error: {e}")
 
 def main():
     """Main entry point"""
     bot = MusicDownloadBot()
     
     try:
+        # Run bot with asyncio
         asyncio.run(bot.run())
     except KeyboardInterrupt:
         logging.info("Bot stopped by user")
