@@ -48,9 +48,15 @@ class MusicDownloadBot:
             sys.exit(1)
 
         # Initialize managers
-        self.notification_manager = None
+        self.notification_manager = NotificationManager(
+            bot=self.application.bot,
+            config=self.config_manager.get_all()
+        )
         self.bandwidth_tracker = BandwidthTracker()
-        self.telegram_logger = None
+        self.telegram_logger = TelegramLogger(
+            bot=self.application.bot, 
+            log_channel_id=self.config_manager.get('LOG_CHANNEL_ID')
+        )
 
     def _setup_logging(self):
         """Configure logging settings"""
@@ -68,22 +74,7 @@ class MusicDownloadBot:
         try:
             # Initialize Telegram Bot
             self.application = Application.builder().token(self.bot_token).build()
-            
-            # Initialize Telegram Logger
-            self.telegram_logger = TelegramLogger(
-                bot=self.application.bot, 
-                log_channel_id=self.config_manager.get('LOG_CHANNEL_ID')
-            )
-
-            # Initialize Notification Manager
-            self.notification_manager = NotificationManager(
-                bot=self.application.bot,
-                config=self.config_manager.get_all()
-            )
-
-            # Register handlers
             self._register_handlers()
-
             logging.info("Bot initialized successfully")
         except Exception as e:
             logging.error(f"Bot initialization failed: {e}")
@@ -91,24 +82,9 @@ class MusicDownloadBot:
 
     def _register_handlers(self):
         """Register all bot command and message handlers"""
-        # User Handlers
-        user_handler = UserHandler(
-            database_manager=self.database_manager,
-            notification_manager=self.notification_manager
-        )
-        
-        # Download Handlers
-        download_handler = DownloadHandler(
-            database_manager=self.database_manager,
-            bandwidth_tracker=self.bandwidth_tracker,
-            notification_manager=self.notification_manager
-        )
-        
-        # Admin Handlers
-        admin_handler = AdminHandler(
-            database_manager=self.database_manager,
-            notification_manager=self.notification_manager
-        )
+        user_handler = UserHandler(self.database_manager, self.notification_manager)
+        download_handler = DownloadHandler(self.database_manager, self.bandwidth_tracker, self.notification_manager)
+        admin_handler = AdminHandler(self.database_manager, self.notification_manager)
 
         # Command Handlers
         self.application.add_handler(CommandHandler('start', user_handler.start_command))
@@ -119,51 +95,31 @@ class MusicDownloadBot:
         self.application.add_handler(CommandHandler('admin', admin_handler.admin_command))
         
         # Message Handlers
-        self.application.add_handler(MessageHandler(
-            filters.TEXT & ~filters.COMMAND, 
-            download_handler.handle_download_url
-        ))
+        self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, download_handler.handle_download_url))
 
     async def download_music(self, url: str, user_id: int):
-        """
-        Wrapper for music download functionality
-        Uses gamdl for downloading
-        """
+        """Wrapper for music download functionality"""
         try:
             # Prepare download parameters
-            sys.argv = [
-                'gamdl', 
-                url, 
-                '--cookies-path', f'cookies/{user_id}_cookies.txt'
-            ]
-            
+            sys.argv = ['gamdl', url, '--cookies-path', f'cookies/{user_id}_cookies.txt']
             # Execute download
             await gamdl_download()
-            
             # Log successful download
-            await self.telegram_logger.log_download(
-                user_id=user_id, 
-                user_name="", 
-                track_info={"url": url}
-            )
+            await self.telegram_logger.log_download(user_id=user_id, user_name="", track_info={"url": url})
         except Exception as e:
             logging.error(f"Download failed: {e}")
             await self.telegram_logger.log_error(e)
 
     async def start_background_tasks(self):
         """Start background tasks"""
-        # Start bandwidth monitoring
         asyncio.create_task(self.bandwidth_tracker.monitor_bandwidth())
 
     async def run(self):
         """Main bot run method"""
         await self.initialize_bot()
         await self.start_background_tasks()
-
         # Start polling
-        await self.application.run_polling(
-            drop_pending_updates=True
-        )
+        await self.application.run_polling(drop_pending_updates=True)
 
 def main():
     """Main entry point"""
