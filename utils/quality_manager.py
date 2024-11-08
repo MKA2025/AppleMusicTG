@@ -246,31 +246,3 @@ class QualityManager:
 
         return available_qualities[0] if available_qualities else None
 
-# Example Usage
-if __name__ == "__main__":
-    quality_manager = QualityManager()
-    
-    # Get default audio profile
-    audio_profile = quality_manager.get_audio_profile()
-    print(audio_profile)
-
-    # Add a custom audio profile
-    custom_audio = quality_manager.add_custom_audio_profile(
-        name="Custom High Quality",
-        bitrate=512,
-        sample_rate=96000,
-        channels=2,
-        description="Custom high-quality audio profile"
-    )
-    print(custom_audio)
-
-    # Get video profile
-    video_profile = quality_manager.get_video_profile(VideoQuality.FULL_HD)
-    print(video_profile)
-
-    # Recommend quality
-    recommended_quality = quality_manager.recommend_quality(
-        available_qualities=[AudioQuality.LOW, AudioQuality.HIGH],
-        preferred_quality=AudioQuality.MEDIUM
-    )
-    print(recommended_quality)
