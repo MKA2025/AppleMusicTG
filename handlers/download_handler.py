@@ -1,3 +1,4 @@
+import os
 from telegram import Update
 from telegram.ext import ContextTypes
 from services.apple_music_service import AppleMusicService
@@ -31,5 +32,10 @@ async def download_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             title=track_info['name'],
             performer=track_info['artist']
         )
+
+        # Delete file after sending
+        os.remove(file_path)
+        print(f"{file_path} deleted successfully.")
+
     except Exception as e:
         await update.message.reply_text(f"An error occurred: {str(e)}")
