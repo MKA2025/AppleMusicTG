@@ -4,3 +4,4 @@ mutagen==1.45.1
 yt-dlp==2021.12.27
 pywidevine==1.8.0    # Updated to the latest compatible version
 m3u8==0.9.0
+python-telegram-bot==20.0  
