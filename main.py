@@ -30,7 +30,7 @@ class MusicDownloadBot:
         self._setup_logging()
 
         # Initialize core components
-        self.config_manager = ConfigManager()
+        self.config_manager = ConfigManager(config_path="config/config.json") 
 
         # Load bot token from config.json
         self.config = self.config_manager.load_config()
