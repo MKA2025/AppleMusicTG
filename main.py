@@ -23,12 +23,7 @@ from utils.notification_manager import NotificationManager
 from utils.bandwidth_tracker import BandwidthTracker
 from utils.media_analyzer import MediaAnalyzer
 
-# Import handlers
-from handlers.cancel_handler import CancelHandler
-from handlers.download_handler import DownloadHandler
-from handlers.settings_handler import SettingsHandler
-from handlers.start_handler import StartHandler
-from handlers.status_handler import StatusHandler
+
 class MusicDownloadBot:
     def __init__(self):
         # Configure logging
