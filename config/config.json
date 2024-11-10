@@ -1,6 +1,6 @@
 {
-    "bot_token": "YOUR_BOT_TOKEN",
-    "admin_users": [123456789],
+    "bot_token": "7227851692:AAEgYq6VzKGQuKb4t-GSguepjMizR96Rlys",
+    "admin_users": [1256695927],
     "log_channel_id": -100123456789,
     "auth_channel_id": -100987654321,
     "auth_channel_link": "https://t.me/yourchannel",
