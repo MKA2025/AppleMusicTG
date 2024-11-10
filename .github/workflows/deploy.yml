@@ -10,24 +10,36 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Checkout code from repository
       - name: Checkout code
         uses: actions/checkout@v2
         with:
-          fetch-depth: 0  # Unshallow the repository
+          fetch-depth: 0  # Unshallow the repository to get full history
 
+      # 2. Set up Python environment
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
-          python-version: '3.10'
+          python-version: '3.10'  # Replace with the Python version you need
 
-      - name: Install dependencies
+      # 3. Install system dependencies required for aiohttp
+      - name: Install system dependencies
         run: |
+          sudo apt-get update
+          sudo apt-get install -y libffi-dev libssl-dev
+
+      # 4. Install Python dependencies
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
           pip install -r requirements.txt
 
+      # 5. Install Heroku CLI
       - name: Install Heroku CLI
         run: |
           curl https://cli-assets.heroku.com/install.sh | sh
 
+      # 6. Log in to Heroku using API key
       - name: Login to Heroku
         env:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
@@ -36,11 +48,13 @@ jobs:
           echo "machine git.heroku.com login $HEROKU_API_KEY password $HEROKU_API_KEY" >> ~/.netrc
           chmod 600 ~/.netrc
 
+      # 7. Configure Git for Heroku (use your Git user info)
       - name: Configure Git for Heroku
         run: |
           git config --global user.email "mkkafarm49@gmail.com"
           git config --global user.name "MKKA Farm"
 
+      # 8. Deploy to Heroku
       - name: Deploy to Heroku
         env:
           HEROKU_APP_NAME: ${{ secrets.HEROKU_APP_NAME }}
