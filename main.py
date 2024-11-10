@@ -2,10 +2,11 @@ import os
 import sys
 import asyncio
 import logging
+import json
 from typing import Dict, Any
+from datetime import datetime
 
 # Import necessary modules
-from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import (
     Application, 
@@ -30,31 +31,25 @@ from handlers.admin_handler import AdminHandler
 
 class MusicDownloadBot:
     def __init__(self):
-        # Load environment variables
-        load_dotenv()
-
         # Configure logging
         self._setup_logging()
 
         # Initialize core components
         self.config_manager = ConfigManager()
-        self.database_manager = DatabaseManager()
-        
-        # Telegram bot setup
-        self.bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
+
+        # Load bot token from config.json
+        self.config = self.config_manager.load_config()
+        self.bot_token = self.config.get("BOT_TOKEN")
         if not self.bot_token:
-            logging.critical("No Telegram Bot Token found!")
+            logging.critical("No Telegram Bot Token found in config!")
             sys.exit(1)
 
-        # Initialize additional managers
-        self.notification_manager = NotificationManager(
-            config=self.config_manager.get_all()
-        )
+        # Initialize other components
+        self.database_manager = DatabaseManager()
+        self.notification_manager = NotificationManager(config=self.config)
         self.bandwidth_tracker = BandwidthTracker()
         self.media_analyzer = MediaAnalyzer()
-        self.telegram_logger = TelegramLogger(
-            log_channel_id=self.config_manager.get('LOG_CHANNEL_ID')
-        )
+        self.telegram_logger = TelegramLogger(log_channel_id=self.config.get('LOG_CHANNEL_ID'))
 
     def _setup_logging(self):
         """Configure logging settings"""
@@ -88,19 +83,9 @@ class MusicDownloadBot:
     def _register_handlers(self):
         """Register all bot command and message handlers"""
         # Initialize handler classes
-        user_handler = UserHandler(
-            self.database_manager, 
-            self.notification_manager
-        )
-        download_handler = DownloadHandler(
-            self.database_manager, 
-            self.bandwidth_tracker, 
-            self.notification_manager
-        )
-        admin_handler = AdminHandler(
-            self.database_manager, 
-            self.notification_manager
-        )
+        user_handler = UserHandler(self.database_manager, self.notification_manager)
+        download_handler = DownloadHandler(self.database_manager, self.bandwidth_tracker, self.notification_manager)
+        admin_handler = AdminHandler(self.database_manager, self.notification_manager)
 
         # Command Handlers
         handlers = [
@@ -118,10 +103,7 @@ class MusicDownloadBot:
             CommandHandler('broadcast', admin_handler.broadcast_command),
             
             # Message Handlers
-            MessageHandler(
-                filters.TEXT & ~filters.COMMAND, 
-                download_handler.handle_download_url
-            )
+            MessageHandler(filters.TEXT & ~filters.COMMAND, download_handler.handle_download_url)
         ]
 
         # Add handlers to application
@@ -131,7 +113,7 @@ class MusicDownloadBot:
     async def _send_startup_notification(self):
         """Send startup notification to admin or log channel"""
         try:
-            admin_chat_id = self.config_manager.get('ADMIN_CHAT_ID')
+            admin_chat_id = self.config.get('ADMIN_CHAT_ID')
             if admin_chat_id:
                 await self.notification_manager.queue_notification(
                     recipient=admin_chat_id,
@@ -148,9 +130,7 @@ class MusicDownloadBot:
             asyncio.create_task(self.bandwidth_tracker.monitor_bandwidth()),
             
             # Notification queue processing
-            asyncio.create_task(
-                self.notification_manager.process_notification_queue()
-            )
+            asyncio.create_task(self.notification_manager.process_notification_queue())
         ]
         return tasks
 
@@ -164,10 +144,7 @@ class MusicDownloadBot:
             background_tasks = await self.start_background_tasks()
             
             # Start polling
-            await self.application.run_polling(
-                drop_pending_updates=True,
-                stop_signals=None
-            )
+            await self.application.run_polling(drop_pending_updates=True, stop_signals=None)
             
             # Wait for background tasks
             await asyncio.gather(*background_tasks)
