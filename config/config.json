@@ -1,9 +1,9 @@
 {
     "bot_token": "7227851692:AAEgYq6VzKGQuKb4t-GSguepjMizR96Rlys",
     "admin_users": [1256695927],
-    "log_channel_id": -100123456789,
-    "auth_channel_id": -100987654321,
-    "auth_channel_link": "https://t.me/yourchannel",
+    "log_channel_id": -1001928730982,
+    "auth_channel_id": -1001928730982,
+    "auth_channel_link": "https://t.me/+YCRkl_y_Hcg1MDVl",
     "regions": {
         "us": {
             "cookies_file": "config/cookies_us.txt",
