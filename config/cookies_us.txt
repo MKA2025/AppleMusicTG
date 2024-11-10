@@ -1,0 +1,9 @@
+# Netscape HTTP Cookie File
+
+.music.apple.com	TRUE	/	TRUE	1731212986	commerce-authorization-token	AAAAAAAAAAJgKX9daVfGCJKayXfNhSjjnjTTpXm27CVG9bOTWF8whDTAd/AIbLvPNtQmssOK7OcutMc3Rj1aRkmEq/th43h1VTKtyOiXrFOFcfTJf6iHhgtMkjVNIeco1Qn08hn2ys6vcm3EtqlLLGdtAqoj8TSpjK2lGw430gPQ5luDtxrQpklDxsFB4hazwXz6KhgEcqNL0SPyyAG9pACe9nfO5v3wtoAm3Eajm2qPBj/pJ+aseeChbJqjgg737ZitQr1vhRm7BDFNYdlBhlV35xn91cFXOwmBMXOd8tOwiMLcQEJWAw==
+.music.apple.com	TRUE	/	TRUE	1746763877	media-user-token	Agr5Og9cp3xEccg0mjlRDF/PoTilZm1YyV7EaGM+OXPZFtBlzNPv5O0WCEGwSvTfuZrtreXgR16v2aTuZiD0Y2NMiPkCr+gxjCaBDiWT0ow0D3bfD8Kw7GETfACE1qNgQKPZVV08QlQe0GqdRWH8P2rZzxOAozT78mMDYpjHz0wlQAqOW37PFvq97UcWbHJoflXWQJ8u0YsRo55gVdJmlTsVsiwuJ6W4ONyTcFRNz9rMa29YlQ==
+.music.apple.com	TRUE	/	TRUE	1738987877	mut-refresh	1
+.music.apple.com	TRUE	/	FALSE	1762747877	itua	US
+.music.apple.com	TRUE	/	FALSE	1746979877	pltvcid	84e631c2dee540179f4b6529f808049b020
+.music.apple.com	TRUE	/	FALSE	1746979877	pldfltcid	48452ecca9144ff6bb1cf219c3b20d7c020
+.music.apple.com	TRUE	/	TRUE	1746763878	itre	0
